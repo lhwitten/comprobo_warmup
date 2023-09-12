@@ -30,6 +30,8 @@ class square_driver(Node):
         self.orientation_bench = Quaternion()
         self.turns = 0.0
         self.orientation = Quaternion()
+        self.wait = False
+        self.w_count = 0
 
 
     
@@ -43,14 +45,20 @@ class square_driver(Node):
         if angdist >= 90.0:
             msg.angular.z = 0.0
             self.turn = False
+            self.wait = True
             self.xpos_b = self.xpos
             self.ypos_b = self.ypos
             self.orientation_bench = self.orientation
-            msg.linear.x = 1.0
+            msg.linear.x = 0.0
             self.turns += 1.0
         else:
-        
-            msg.angular.z = -.2 #* abs(91 - angdist)/270
+            
+            if np.isnan(angdist):
+                msg.angular.z = -.2
+            else:
+                msg.angular.z = -.05 - .5* abs(90 - angdist)/90
+            
+
             #print(-1.0 * abs(91 - angdist)/270)
             msg.linear.x = 0.0
         self.vel_pub.publish(msg)
@@ -65,13 +73,14 @@ class square_driver(Node):
         if distance >= 1.0:
             msg.linear.x = 0.0
             self.turn = True
+            self.wait = True
             self.xpos_b = self.xpos
             self.xpos_b = self.ypos
             self.orientation_bench = self.orientation
-            msg.angular.z = -1.0
+            msg.angular.z = 0.0
         else:
         
-            msg.angular.z = 0.0
+            # msg.angular.z = 0.0
             msg.linear.x = 1.1 - distance
             print(distance)
         self.vel_pub.publish(msg)
@@ -102,11 +111,28 @@ class square_driver(Node):
         #self.orientation = my_quaternion
         self.orientation = msg.pose.pose.orientation
 
+    def wait_robot(self):
+        msg = Twist()
+        msg.angular.z = 0.0
+        msg.linear.x = 0.0
+        self.vel_pub.publish(msg)
+
+        self.w_count +=1
+
+        print("waiting")
+
+        if self.w_count > 15:
+            self.wait = False
+            self.w_count = 0
+
+
 
     def run_loop(self):
         #stop after turn 4
         if self.turns >= 4:
-            pass
+            self.wait_robot()
+        elif self.wait:
+            self.wait_robot()
         elif self.turn:
             self.turn_90()
         else:
@@ -129,5 +155,3 @@ def quat_angle(q1,q2):
     inner_prod =  q1.w *q2.w + q1.x *q2.x + q1.y + q2.y + q1.z * q2.z
 
     return 180/np.pi * np.arccos(2 * (inner_prod**2) -1)
-
-
