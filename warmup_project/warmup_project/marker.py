@@ -12,7 +12,6 @@ class sphere_publisher(Node):
         self.create_timer(.1,self.run_loop)
 
 
-
     def run_loop(self):
         my_mark = Marker()
         my_mark.type = Marker.SPHERE

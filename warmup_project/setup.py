@@ -22,6 +22,8 @@ setup(
         'console_scripts': [
             'marker = warmup_project.marker:main',
             'drive_square = warmup_project.drive_square:main',
+            'teleop = warmup_project.teleop:main',
+            'wall_follower = warmup_project.wall_follower:main',
         ],
     },
 )

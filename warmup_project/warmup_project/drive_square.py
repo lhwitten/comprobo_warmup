@@ -6,7 +6,6 @@ from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry
 import math
 import numpy as np
-import pyquaternion as pyq
 
 class square_driver(Node):
     def __init__(self):
@@ -32,7 +31,6 @@ class square_driver(Node):
         self.orientation = Quaternion()
         self.wait = False
         self.w_count = 0
-
 
     
     def turn_90(self):
