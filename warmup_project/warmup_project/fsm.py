@@ -1,3 +1,4 @@
+# Import necessary libraries and message types
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
@@ -11,6 +12,7 @@ import select
 import sys
 import termios
 
+# Define movement and speed bindings for teleoperation
 moveBindings = {
     "i": (1, 0, 0, 0),
     "o": (1, 0, 0, -1),
@@ -42,6 +44,7 @@ speedBindings = {
 }
 
 
+# Define the RobotController class, which is a ROS2 node
 class RobotController(Node):
     def __init__(self):
         super().__init__("robot_controller")
@@ -105,6 +108,7 @@ class RobotController(Node):
             self.reset_teleop_settings()
 
     def reset_teleop_settings(self):
+        # Reset robot's velocity to zero and restore terminal settings
         twist = Twist()
         twist.linear.x = 0.0
         twist.linear.y = 0.0
@@ -112,27 +116,38 @@ class RobotController(Node):
         twist.angular.x = 0.0
         twist.angular.y = 0.0
         twist.angular.z = 0.0
-        self.cmd_vel_publisher.publish(twist)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+        self.cmd_vel_publisher.publish(twist)  # Publish zero velocity
+        termios.tcsetattr(
+            sys.stdin, termios.TCSADRAIN, self.settings
+        )  # Restore terminal settings
 
     def get_key(self):
-        tty.setraw(sys.stdin.fileno())
-        select.select([sys.stdin], [], [], 0)
-        key = sys.stdin.read(1)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
+        # Read a single keypress from the terminal
+        tty.setraw(
+            sys.stdin.fileno()
+        )  # Set terminal to raw mode for single key reading
+        select.select([sys.stdin], [], [], 0)  # Non-blocking input
+        key = sys.stdin.read(1)  # Read one character
+        termios.tcsetattr(
+            sys.stdin, termios.TCSADRAIN, self.settings
+        )  # Restore terminal settings
         return key
 
     def start_person_following(self):
+        # Start the person following mode
         if self.person_follower is None:
-            self.teleop_mode = False
-            self.person_follower = PersonFollower(self)
-            self.person_follower.start()
+            self.teleop_mode = False  # Set teleop mode to False
+            self.person_follower = PersonFollower(
+                self
+            )  # Initialize the person follower node
+            self.person_follower.start()  # Start the person following mode
 
     def stop_person_following(self):
+        # Stop the person following mode
         if self.person_follower is not None:
-            self.teleop_mode = True
-            self.person_follower.destroy_node()
-            self.person_follower = None
+            self.teleop_mode = True  # Set teleop mode to True
+            self.person_follower.destroy_node()  # Destroy the person follower node
+            self.person_follower = None  # Set the person follower node to None
 
     def switch_to_teleop_mode(self):
         self.stop_person_following()  # Stop person following mode
@@ -142,6 +157,7 @@ class RobotController(Node):
         self.process_teleop()  # Restart teleoperation mode
 
 
+# Define the PersonFollower class, responsible for following a person
 class PersonFollower(Node):
     def __init__(self, controller):
         super().__init__("PersonFollower")
@@ -217,7 +233,6 @@ class PersonFollower(Node):
 
     def process_scan(self, msg):
         cutoff_dist = 1.5  # meters
-        # short_range = [[i,msg.ranges[i]] for i in range(360) if msg.ranges[i] > cutoff_dist if (i > 30 or 329 < i)]
 
         short_range = [
             [i, msg.ranges[i]] for i in range(360) if msg.ranges[i] < cutoff_dist
@@ -259,6 +274,7 @@ class PersonFollower(Node):
         return distance
 
 
+# Define the main function to initialize ROS2 and control the robot
 def main(args=None):
     rclpy.init(args=args)
 
@@ -275,5 +291,6 @@ def main(args=None):
     rclpy.shutdown()
 
 
+# Run the main function if the script is executed directly
 if __name__ == "__main__":
     main()
