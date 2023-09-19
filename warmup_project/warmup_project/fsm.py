@@ -60,16 +60,24 @@ class RobotController(Node):
         self.key = None
 
         # Initialize person following
-        self.person_follower = PersonFollower(self)
-        self.person_follower.start()
+        self.person_follower = None
+
+        self.quit = False
 
     def process_teleop(self):
         try:
             print("Teleop mode active.")
             while self.key != "\x03":
                 self.key = self.get_key()
-
-                if self.key in moveBindings.keys():
+                if (
+                    self.key == "\x1b"
+                ):  # Check for the escape key (27 is the ASCII code for Esc)
+                    self.start_person_following()
+                    break  # Exit teleoperation and start person following mode
+                elif self.key == "p":
+                    self.quit = True
+                    break
+                elif self.key in moveBindings.keys():
                     self.x, self.y, self.z, self.th = moveBindings[self.key]
                 elif self.key in speedBindings.keys():
                     self.speed *= speedBindings[self.key][0]
@@ -114,6 +122,25 @@ class RobotController(Node):
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
         return key
 
+    def start_person_following(self):
+        if self.person_follower is None:
+            self.teleop_mode = False
+            self.person_follower = PersonFollower(self)
+            self.person_follower.start()
+
+    def stop_person_following(self):
+        if self.person_follower is not None:
+            self.teleop_mode = True
+            self.person_follower.destroy_node()
+            self.person_follower = None
+
+    def switch_to_teleop_mode(self):
+        self.stop_person_following()  # Stop person following mode
+        self.teleop_mode = True
+        self.distance = 0.0  # Reset the distance variable
+        print("Switched back to Teleop mode.")
+        self.process_teleop()  # Restart teleoperation mode
+
 
 class PersonFollower(Node):
     def __init__(self, controller):
@@ -127,6 +154,9 @@ class PersonFollower(Node):
         self.ypos = 0
         self.person_coord = [1, 0, 0, 1]
         self.viz_pub = self.create_publisher(Marker, "Sphere", 10)
+        self.distance_threshold = (
+            1.0  # Distance threshold to switch back to teleoperation
+        )
 
     def start(self):
         print("Person following mode active.")
@@ -138,6 +168,7 @@ class PersonFollower(Node):
         self.ypos = msg.pose.pose.position.y
 
     def run_loop(self):
+        print("person")
         msg = Twist()
         print(self.person_coord)
         if abs(self.person_coord[2]) > np.pi / 2:
@@ -150,6 +181,15 @@ class PersonFollower(Node):
         self.vel_pub.publish(msg)
         my_mark = self.get_mark()
         self.viz_pub.publish(my_mark)
+
+        # Update the distance variable
+        self.controller.distance = self.pythag(
+            self.person_coord[0], self.person_coord[1]
+        )
+
+        # Check if distance is greater than 1 and switch to teleop mode
+        if self.controller.distance > 1.0:
+            self.controller.switch_to_teleop_mode()
 
     def get_mark(self):
         my_mark = Marker()
@@ -223,7 +263,12 @@ def main(args=None):
     rclpy.init(args=args)
 
     robot_controller = RobotController()
-    robot_controller.process_teleop()
+    while not robot_controller.quit:
+        if robot_controller.teleop_mode:
+            robot_controller.process_teleop()
+        else:
+            rclpy.spin(robot_controller.person_follower)
+            continue
 
     # Stop person following when teleop exits
     robot_controller.person_follower.destroy_node()
